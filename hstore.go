@@ -7,31 +7,36 @@ import (
 )
 
 var (
-	ErrEmptyMap    = errors.New("cannot create the query of hstore data type because the map provided in parameters is empty")
+	ErrEmptyMaps   = errors.New("cannot create the query of hstore data type because the maps provided in parameters are empty")
 	ErrTagsParsing = errors.New("cannot parse tags stored as hstore")
 )
 
-func getNewQuery(query string, column string, key string, value string) string {
-	queryBase := fmt.Sprintf("%s->'%s' = '%s'", column, key, value)
-	if query == "(" {
-		query += queryBase
-	} else {
-		query += fmt.Sprintf(" OR %s", queryBase)
-	}
-	return query
-}
-
 // ConditionalQuery transforms a map into a conditional query by recursion of hstore.
-func ConditionalQuery(column string, m map[string][]string) (string, error) {
-	if len(m) == 0 {
-		return "", ErrEmptyMap
+func ConditionalQuery(column string, ms []map[string]string) (string, error) {
+	if len(ms) == 0 {
+		return "", ErrEmptyMaps
 	}
 	query := "("
 
-	for key, values := range m {
-		for _, v := range values {
-			query = getNewQuery(query, column, key, v)
+	for i, m := range ms {
+		if len(ms) > 1 {
+			query += "("
 		}
+		j := 0
+		for key, value := range m {
+			query += fmt.Sprintf("%s->'%s' = '%s'", column, key, value)
+			if j < len(m) - 1 {
+				query += " AND "
+			}
+			j += 1
+		}
+		if len(ms) > 1 {
+			query += ")"
+		}
+		if i < len(ms) - 1 {
+			query += " OR "
+		}
+		i += 1
 	}
 	query += ")"
 	return query, nil

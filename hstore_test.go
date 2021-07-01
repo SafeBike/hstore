@@ -9,11 +9,12 @@ import (
 
 func TestConditionalQuery(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		m := map[string][]string{
-			"amenity": {"restaurant", "bench"},
+		m := []map[string]string{
+			{
+				"amenity": "restaurant",
+			},
 		}
-
-		expectedQuery := "(tags->'amenity' = 'restaurant' OR tags->'amenity' = 'bench')"
+		expectedQuery := "(tags->'amenity' = 'restaurant')"
 		columnName := "tags"
 		query, err := hstore.ConditionalQuery(columnName, m)
 		assert.NoError(t, err)
@@ -21,27 +22,50 @@ func TestConditionalQuery(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		m := map[string][]string{
-			"amenity": {"restaurant", "bench"},
-			"name":    {"some name"},
+		m := []map[string]string{
+			{
+				"amenity": "restaurant",
+			},
+			{
+				"amenity": "bench",
+			},
 		}
+		expectedQuery := "((tags->'amenity' = 'restaurant') OR (tags->'amenity' = 'bench'))"
+		columnName := "tags"
+		query, err := hstore.ConditionalQuery(columnName, m)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedQuery, query)
+	})
 
-		expectedQuery := "(tags->'amenity' = 'restaurant' OR tags->'amenity' = 'bench' OR tags->'name' = 'some name')"
-		expectedQuery2 := "(tags->'name' = 'some name' OR tags->'amenity' = 'restaurant' OR tags->'amenity' = 'bench')"
+	t.Run("success", func(t *testing.T) {
+		m := []map[string]string{
+			{
+				"amenity":    "restaurant",
+				"diet:vegan": "yes",
+			},
+			{
+				"amenity":  "bench",
+				"material": "wood",
+			},
+		}
+		expectedQuery := "((tags->'amenity' = 'restaurant' AND tags->'diet:vegan' = 'yes') OR (tags->'amenity' = 'bench' AND tags->'material' = 'wood'))"
+		expectedQuery2 := "((tags->'diet:vegan' = 'yes' AND tags->'amenity' = 'restaurant') OR (tags->'material' = 'wood' AND tags->'amenity' = 'bench'))"
+		expectedQuery3 := "((tags->'diet:vegan' = 'yes' AND tags->'amenity' = 'restaurant') OR (tags->'amenity' = 'bench' AND tags->'material' = 'wood'))"
+		expectedQuery4 := "((tags->'amenity' = 'restaurant' AND tags->'diet:vegan' = 'yes') OR (tags->'material' = 'wood' AND tags->'amenity' = 'bench'))"
 		columnName := "tags"
 		query, err := hstore.ConditionalQuery(columnName, m)
 		assert.NoError(t, err)
 		assert.Condition(t, func() (success bool) {
-			return query == expectedQuery || query == expectedQuery2
+			return query == expectedQuery || query == expectedQuery2 || query == expectedQuery3 || query == expectedQuery4
 		})
 	})
 
 	t.Run("error", func(t *testing.T) {
-		m := make(map[string][]string)
+		m := make([]map[string]string, 0)
 
 		columnName := "tags"
 		query, err := hstore.ConditionalQuery(columnName, m)
-		assert.Error(t, err, hstore.ErrEmptyMap)
+		assert.Error(t, err, hstore.ErrEmptyMaps)
 		assert.Empty(t, query)
 	})
 }
@@ -50,8 +74,8 @@ func TestToMap(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		tags := `"seats"=>"5", "amenity"=>"bench", "backrest"=>"yes", "material"=>"wood"`
 		expectedRes := map[string]string{
-			"seats": "5",
-			"amenity": "bench",
+			"seats":    "5",
+			"amenity":  "bench",
 			"backrest": "yes",
 			"material": "wood",
 		}
